@@ -9,9 +9,11 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    unoptimized: true,
+    unoptimized: true, // works with Leaflet and external images
   },
   devIndicators: false,
+  reactStrictMode: false,
+  output: 'standalone', // ensures serverless deploy compatibility
 }
 
 export default nextConfig

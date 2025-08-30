@@ -1,5 +1,8 @@
-import React from "react"
+"use client"
+import React, { useState, useRef, useEffect } from "react"
+import L from "leaflet"
 import { UnnatKhetiLogo } from "@/components/logo-unnatkheti"
+import Map from "@/components/Map"
 
 function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
@@ -14,6 +17,54 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 export default function HomePage() {
+  const [searchValue, setSearchValue] = useState("");
+  const mapRef = useRef<L.Map | null>(null)
+  const [eeData, setEeData] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+      }
+    };
+  }, [])
+  
+
+  useEffect(() => {
+    // @ts-ignore
+    import("leaflet/dist/leaflet.css")
+  }, [])
+  const districts: Record<string, [number, number]> = {
+  "delhi": [28.6139, 77.2090],
+  "mumbai": [19.0760, 72.8777],
+  "kolkata": [22.5726, 88.3639],
+  "chennai": [13.0827, 80.2707],
+  "bengaluru": [12.9716, 77.5946],
+  // Add more as needed
+};
+
+  const fetchEarthEngineData = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const response = await fetch("/api/earthengine")
+      const data = await response.json()
+      if (data.success) {
+        setEeData(data.data)
+      } else {
+        setError(data.error || "An unknown error occurred")
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unknown error occurred")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <main className="min-h-screen bg-zinc-950 text-white">
       {/* Header */}
@@ -141,20 +192,35 @@ export default function HomePage() {
       {/* Demo */}
       <section id="demo" className="px-4 md:px-8 py-16 bg-zinc-900/50">
         <div className="mx-auto max-w-7xl">
-          <SectionTitle>Demo Map</SectionTitle>
-          <div
-            className="mt-10 relative h-[520px] w-full rounded-lg border border-zinc-800 bg-cover bg-center"
-            style={{ backgroundImage: 'url("/images/map-satellite-imagery-placeholder.png")' }}
-            aria-label="Demo map placeholder"
-          >
-            <div className="absolute inset-0 rounded-lg bg-black/40" />
+      <SectionTitle>Demo Map</SectionTitle>
+     <div className="mt-10 relative h-[520px] w-full rounded-lg border border-zinc-800 overflow-hidden">
+    {mounted && (
+      <Map
+        key="main-map"
+        center={[20.5937, 78.9629]} // Center on India
+        zoom={5}
+        style={{ height: "100%", width: "100%" }}
+        mapRef={mapRef}
+      />
+    )}
+        <div className="absolute inset-0 rounded-lg bg-black/40" />
 
             <div className="absolute top-6 left-6">
               <div className="relative w-72">
                 <input
-                  placeholder="Search districts..."
-                  className="w-full rounded-md border border-transparent bg-zinc-800/90 py-2 pl-10 pr-3 text-sm placeholder:text-slate-400 text-white focus:outline-none focus:ring-2 focus:ring-[#2e7d32]/50"
-                />
+  value={searchValue}
+  onChange={e => setSearchValue(e.target.value)}
+  onKeyDown={e => {
+    if (e.key === "Enter") {
+      const key = searchValue.trim().toLowerCase();
+      if (districts[key] && mapRef.current) {
+        mapRef.current.setView(districts[key], 10);
+      }
+    }
+  }}
+  placeholder="Search districts..."
+  className="w-full rounded-md border border-transparent bg-zinc-800/90 py-2 pl-10 pr-3 text-sm placeholder:text-slate-400 text-white focus:outline-none focus:ring-2 focus:ring-[#2e7d32]/50"
+/>
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
                   <svg
                     width="18"
@@ -170,35 +236,70 @@ export default function HomePage() {
             </div>
 
             <div className="absolute bottom-6 right-6 flex flex-col gap-2">
-              <button
-                className="flex h-10 w-10 items-center justify-center rounded-md bg-zinc-800/90 text-white hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-600"
-                aria-label="Zoom in"
-              >
-                <svg
-                  width="22"
-                  height="22"
-                  viewBox="0 0 256 256"
-                  fill="currentColor"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z" />
-                </svg>
-              </button>
-              <button
-                className="flex h-10 w-10 items-center justify-center rounded-md bg-zinc-800/90 text-white hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-600"
-                aria-label="Zoom out"
-              >
-                <svg
-                  width="22"
-                  height="22"
-                  viewBox="0 0 256 256"
-                  fill="currentColor"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128Z" />
-                </svg>
-              </button>
-            </div>
+  <button
+    className="flex h-10 w-10 items-center justify-center rounded-md bg-zinc-800/90 text-white hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-600"
+    aria-label="Zoom in"
+    onClick={() => {
+      if (mapRef.current) {
+        mapRef.current.setZoom(mapRef.current.getZoom() + 1)
+      }
+    }}
+  >
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 256 256"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z" />
+    </svg>
+  </button>
+  <button
+    className="flex h-10 w-10 items-center justify-center rounded-md bg-zinc-800/90 text-white hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-600"
+    aria-label="Zoom out"
+    onClick={() => {
+      if (mapRef.current) {
+        mapRef.current.setZoom(mapRef.current.getZoom() - 1)
+      }
+    }}
+  >
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 256 256"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128Z" />
+    </svg>
+  </button>
+</div>
+          </div>
+        </div>
+      </section>
+
+      {/* Fetch Earth Engine Data */}
+      <section id="fetch-data" className="px-4 md:px-8 py-16">
+        <div className="mx-auto max-w-7xl">
+          <SectionTitle>Fetch Earth Engine Data</SectionTitle>
+          <div className="mt-10 flex flex-col items-center gap-4">
+            <button
+              onClick={fetchEarthEngineData}
+              disabled={isLoading}
+              className="inline-flex items-center justify-center rounded-md bg-[#2e7d32] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#276a2a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2e7d32]/60 disabled:opacity-50"
+            >
+              {isLoading ? "Loading..." : "Fetch Data"}
+            </button>
+            {error && <p className="text-red-500">{error}</p>}
+            {eeData && (
+              <div className="mt-4 w-full max-w-4xl rounded-lg border border-zinc-800 bg-zinc-900 p-6">
+                <h3 className="text-lg font-semibold text-white">Earth Engine API Response</h3>
+                <pre className="mt-2 text-sm text-slate-300 overflow-auto whitespace-pre-wrap">
+                  {JSON.stringify(eeData, null, 2)}
+                </pre>
+              </div>
+            )}
           </div>
         </div>
       </section>
